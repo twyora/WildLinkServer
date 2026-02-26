@@ -1,0 +1,21 @@
+config MAX30102_DRIVER_ENABLED
+    bool "Enable MAX30102 Driver"
+    default y
+
+if MAX30102_DRIVER_ENABLED
+menu "MAX30102 Configuration"
+    config MAX30102_I2C_BUS_ID
+    int "MAX30102 I2C Bus ID"
+    range 1 1
+    default 1
+
+    config MAX30102_INT_PIN
+    int "MAX30102 INT PIN"
+    range 0 31
+    default 5
+endmenu # "MAX30102 Configuration"
+endif # MAX30102_DRIVER_ENABLED
+
+config MAX30205_DRIVER_ENABLED
+    bool "Enable max30205 Driver"
+    default y

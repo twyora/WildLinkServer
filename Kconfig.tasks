@@ -1,0 +1,70 @@
+if MAX30102_DRIVER_ENABLED
+
+config MAX30102_TASK_ENABLED
+    bool "Enable MAX30102 Task"
+    default y
+
+menu "MAX30102 Task"
+depends on MAX30102_TASK_ENABLED
+
+config MAX30102_TASK_STACK_SIZE
+    int
+    prompt "Config the max30102 task stack size"
+    default 512
+    help
+        Config the max30102 task stack size.
+
+config MAX30102_TASK_PRIORITY
+    int
+    prompt "Config the max30102 task priority"
+    range 0 31
+    default 16
+    help
+        Config the max30102 task priority.
+endmenu # "MAX30102 Task"
+
+endif # MAX30102_DRIVER_ENABLED
+
+if MAX30205_DRIVER_ENABLED
+
+config MAX30205_TASK_ENABLED
+    bool "Enable MAX30205 Task"
+    default y
+
+menu "MAX30205 Task"
+depends on MAX30205_TASK_ENABLED
+
+config MAX30205_TASK_STACK_SIZE
+    int
+    prompt "Config the max30205 task stack size"
+    default 512
+    help
+        Config the max30205 task stack size.
+
+config MAX30205_TASK_PRIORITY
+    int
+    prompt "Config the max30205 task priority"
+    range 0 31
+    default 16
+    help
+        Config the max30205 task priority.
+endmenu # "MAX30205 Task"
+
+endif # MAX30205_DRIVER_ENABLED
+
+menu "SLE Server Task"
+config SLE_SERVER_TASK_STACK_SIZE
+    int
+    prompt "Config the sle server task stack size"
+    default 512
+    help
+        Config the sle server task stack size.
+
+config SLE_SERVER_TASK_PRIORITY
+    int
+    prompt "Config the sle server task priority"
+    range 0 31
+    default 15
+    help
+        Config the sle server task priority.
+endmenu # SLE Server Task

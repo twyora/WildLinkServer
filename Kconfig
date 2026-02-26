@@ -1,0 +1,47 @@
+if SAMPLE_SUPPORT_WILD_LINK_SERVER
+
+config APP_INIT_TASK_STACK_SIZE
+    int
+    prompt "Config the app init task stack size"
+    default 256
+    help
+        Config the app init task stack size.
+
+config APP_INIT_TASK_PRIORITY
+    int
+    prompt "Config the app init task stack size"
+    range 0 31
+    default 14
+    help
+        Config the app init task stack size.
+
+menu "Soft I2C Configuration"
+config SOFT_I2C_SCL_PIN
+    int
+    prompt "Select the soft i2c scl pin"
+    range 0 16
+    default 0
+
+config SOFT_I2C_SDA_PIN
+    int
+    prompt "Select the soft i2c sda pin"
+    range 0 16
+    default 2
+config SOFT_I2C_SUPPORT_CONCURRENCY
+    bool "soft i2c support concurrency"
+    default y
+endmenu
+
+menu "Sle Configuration"
+    osource "application/samples/demo/wild_link_server/Kconfig.sle"
+endmenu # Sle Configuration
+
+menu "Drivers Configuration"
+    osource "application/samples/demo/wild_link_server/Kconfig.drivers"
+endmenu # "Drivers Configuration"
+
+menu "Task Configuration"
+    osource "application/samples/demo/wild_link_server/Kconfig.tasks"
+endmenu # Task Configuration
+
+endif # SAMPLE_SUPPORT_WILD_LINK_SERVER

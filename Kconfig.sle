@@ -1,0 +1,20 @@
+config SLE_SERVER_APP_UUID
+    hex "Sle app uuid"
+    default 0x1234
+
+config SLE_SERVER_SERVICE_UUID
+    hex "Sle service uuid"
+    default 0x2222
+
+config SLE_SERVER_MAX30102_UUID
+    hex "MAX30102 property uuid"
+    default 0x2323
+
+config SLE_SERVER_MAX30205_UUID
+    hex "MAX30205 property uuid"
+    default 0x2324
+
+config SLE_SERVER_ADDR_LOW_BYTE
+    hex "Sle server addr low byte"
+    range 0x00 0xff
+    default 0x01
