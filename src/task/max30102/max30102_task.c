@@ -24,6 +24,7 @@
 
 #define MAX30102_SAMPLE_DATA_BUFFER_SIZE 500
 #define MAX30102_SLIDING_WINDOW_KEEP_COUNT 400
+#define MAX30102_EVENT_READ_TIMEOUT_MS 300
 
 #if MAX30102_SAMPLE_DATA_BUFFER_SIZE < MAX30102_SLIDING_WINDOW_KEEP_COUNT
 #error                                                                                 \
@@ -31,139 +32,11 @@
 #endif // MAX30102_SAMPLE_DATA_BUFFER_SIZE < MAX30102_SLIDING_WINDOW_KEEP_COUNT
 
 #define MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED 1
-
 #if MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
-#define MAX30102_SAMPLE_DATA_BUFFER_SIZE 500
-#define MAX30102_SLIDING_WINDOW_KEEP_COUNT 400
-#define MAX30102_FILTER_ORDER 5
 #define MAX30102_LOWPASS_CUTOFF_HZ 5
 #define MAX30102_SAMPLING_RATE 100
-#define MAX30102_HEART_RATE_MIN 40
-#define MAX30102_HEART_RATE_MAX 200
-#define MAX30102_SPO2_MIN 80
-#define MAX30102_SPO2_MAX 100
 #define MAX30102_OUTPUT_SMOOTH_COUNT 5
-#define MAX30102_SIGNAL_QUALITY_THRESHOLD 50
-#endif // MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
-
-#if MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
-
-/**
- * @brief 五阶平滑滤波
- */
-static void signal_preprocess_5th_order_smooth(int32_t *signal, uint32_t length) {
-    if (length < 5) {
-        return;
-    }
-
-    int32_t sum;
-    // 从后向前处理，避免数据覆盖
-    for (uint32_t i = length - 3; i >= 2; i--) {
-        sum = signal[i - 2] + signal[i - 1] + signal[i] + signal[i + 1] + signal[i + 2];
-        signal[i] = sum / 5;
-    }
-}
-
-/**
- * @brief 低通滤波
- */
-static void signal_preprocess_lowpass_filter(int32_t *signal, uint32_t length,
-                                             int32_t sampling_rate, int32_t cutoff_hz) {
-    if (length < 2) {
-        return;
-    }
-
-    // 计算滤波系数
-    int32_t alpha = (2 * 314 * cutoff_hz * 1024) / (sampling_rate * 1000);
-    if (alpha > 1024)
-        alpha = 1024;
-    if (alpha < 1)
-        alpha = 1;
-
-    int32_t y_prev = signal[0];
-
-    for (uint32_t i = 1; i < length; i++) {
-        int32_t y = alpha * signal[i] + (1024 - alpha) * y_prev;
-        signal[i] = y / 1024;
-        y_prev = signal[i];
-    }
-}
-
-static void signal_preprocess_remove_baseline(int32_t *signal, uint32_t length) {
-    if (length < 2) {
-        return;
-    }
-
-    int32_t hp_alpha = 32;
-
-    int32_t x_prev = signal[0];
-    signal[0] = 0;
-    int32_t y_prev = 0;
-
-    for (uint32_t i = 0; i < length; i++) {
-        int32_t diff = signal[i] - x_prev;
-        y_prev = (hp_alpha * diff + (1024 - hp_alpha) * y_prev) / 1024;
-        signal[i] = y_prev;
-        x_prev = signal[i];
-    }
-}
-
-/**
- * @brief 信号质量评估（不修改数据）
- */
-static int32_t signal_quality_assessment(int32_t *ir_signal, int32_t *red_signal,
-                                         uint32_t length) {
-    uint32_t i;
-    int32_t ir_mean = 0;
-    int32_t ir_variance = 0;
-    int32_t peak_count = 0;
-    int32_t quality_score = 0;
-    int32_t threshold;
-
-    // 计算均值
-    for (i = 0; i < length; i++) {
-        ir_mean += ir_signal[i];
-    }
-    ir_mean = ir_mean / length;
-
-    // 计算方差
-    for (i = 0; i < length; i++) {
-        int32_t diff = ir_signal[i] - ir_mean;
-        ir_variance += (diff * diff) / length;
-    }
-
-    // 检测波峰
-    threshold = ir_mean + (ir_variance / 100);
-    for (i = 1; i < length - 1; i++) {
-        if (ir_signal[i] > ir_signal[i - 1] && ir_signal[i] > ir_signal[i + 1]
-            && ir_signal[i] > threshold)
-        {
-            peak_count++;
-        }
-    }
-
-    // 评分
-    if (peak_count >= 3 && peak_count <= 17) {
-        quality_score += 40;
-    }
-    else if (peak_count >= 2 && peak_count <= 20) {
-        quality_score += 20;
-    }
-
-    if (ir_variance > 1000 && ir_variance < 1000000) {
-        quality_score += 30;
-    }
-    else if (ir_variance > 500 && ir_variance < 2000000) {
-        quality_score += 15;
-    }
-
-    quality_score += 30;
-    if (quality_score > 100)
-        quality_score = 100;
-
-    return quality_score;
-}
-
+#define MAX30102_SIGNAL_QUALITY_THRESHOLD 60
 #endif // MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
 
 osal_task *g_max30102_task_handle;
@@ -202,6 +75,25 @@ static void max30102_interface_irq_callback(max30102_handle_t *handle,
                                             max30102_interrupt_status_t status);
 static void max30102_interface_delay_ms(uint32_t ms);
 static void max30102_interface_debug_print(const char *const fmt, ...);
+
+#if MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
+/**
+ * @brief 五阶平滑滤波
+ */
+static void signal_preprocess_5th_order_smooth(int32_t *signal, uint32_t length);
+/**
+ * @brief 低通滤波
+ */
+static void signal_preprocess_lowpass_filter(int32_t *signal, uint32_t length,
+                                             int32_t sampling_rate, int32_t cutoff_hz);
+static void signal_preprocess_remove_baseline(int32_t *signal, uint32_t length);
+#endif // MAX30102_SAMPLE_DATA_PREPROCESS_ENABLED
+
+/**
+ * @brief 信号质量评估（不修改数据）
+ */
+static int32_t signal_quality_assessment(int32_t *ir_signal, int32_t *red_signal,
+                                         uint32_t length);
 
 static int max30102_task(void *args);
 
@@ -259,12 +151,64 @@ _error_return:
     return ERRCODE_FAIL;
 }
 
+static int32_t signal_quality_assessment(int32_t *ir_signal, int32_t *red_signal,
+                                         uint32_t length) {
+    uint32_t i;
+    int32_t ir_mean = 0;
+    int32_t ir_variance = 0;
+    int32_t peak_count = 0;
+    int32_t quality_score = 0;
+    int32_t threshold;
+
+    // 计算均值
+    for (i = 0; i < length; i++) {
+        ir_mean += ir_signal[i];
+    }
+    ir_mean = ir_mean / length;
+
+    // 计算方差
+    for (i = 0; i < length; i++) {
+        int32_t diff = ir_signal[i] - ir_mean;
+        ir_variance += (diff * diff) / length;
+    }
+
+    // 检测波峰
+    threshold = ir_mean + (ir_variance / 100);
+    for (i = 1; i < length - 1; i++) {
+        if (ir_signal[i] > ir_signal[i - 1] && ir_signal[i] > ir_signal[i + 1]
+            && ir_signal[i] > threshold)
+        {
+            peak_count++;
+        }
+    }
+
+    // 评分
+    if (peak_count >= 3 && peak_count <= 17) {
+        quality_score += 40;
+    }
+    else if (peak_count >= 2 && peak_count <= 20) {
+        quality_score += 20;
+    }
+
+    if (ir_variance > 1000 && ir_variance < 1000000) {
+        quality_score += 30;
+    }
+    else if (ir_variance > 500 && ir_variance < 2000000) {
+        quality_score += 15;
+    }
+
+    quality_score += 30;
+    if (quality_score > 100)
+        quality_score = 100;
+
+    return quality_score;
+}
+
 static int max30102_task(void *args) {
     unused(args);
-    WLID_LINK_SERVER_LOG_INFO("start\r\n");
-    osal_msleep(1000);
 
-    uint8_t ret;
+    osal_msleep(1000);
+    WLID_LINK_SERVER_LOG_INFO("start\r\n");
 
 #if CONFIG_MAX30102_INT_PIN == 4
     uapi_pin_set_mode(CONFIG_MAX30102_INT_PIN, PIN_MODE_2);
@@ -276,6 +220,8 @@ static int max30102_task(void *args) {
     uapi_gpio_set_dir(CONFIG_MAX30102_INT_PIN, GPIO_DIRECTION_INPUT);
     uapi_gpio_register_isr_func(CONFIG_MAX30102_INT_PIN, GPIO_INTERRUPT_FALLING_EDGE,
                                 max30102_int_triggered);
+
+    uint8_t ret;
 
     // initialize max30102 handler
     MAX30102_LINK_INIT(&g_max30102_handle);
@@ -302,18 +248,22 @@ static int max30102_task(void *args) {
 
     // configure max30102 registers
     const uint8_t reg_configs[][2] = {
-        {MAX30102_REG_INTERRUPT_ENABLE_1, 0x80}, // only FIFO Almost Full int enabled
-        {MAX30102_REG_FIFO_WRITE_POINTER, 0x00},
-        {MAX30102_REG_OVERFLOW_COUNTER, 0x00},
-        {MAX30102_REG_FIFO_READ_POINTER, 0x00},
-        {MAX30102_REG_FIFO_CONFIG,
-         0x1c}, // sample avg = 4,fifo rollover = 1, fifo almost full = 20
-        {MAX30102_REG_MODE_CONFIG,
-         0x03}, // 0x02 for Red only, 0x03 for SpO2 mode 0x07 multimode LED
-        {MAX30102_REG_SPO2_CONFIG, 0x67}, // SPO2_ADC range = 4096nA, SPO2 sample
-                                          // rate(100 Hz), LED pulseWidth (400uS)
-        {MAX30102_REG_LED_PULSE_1, 0x3f}, // Choose value for ~ 7mA for LED1
-        {MAX30102_REG_LED_PULSE_2, 0x3f}  // Choose value for ~ 7mA for LED2
+        {MAX30102_REG_INTERRUPT_ENABLE_1, 0x80}, // FIFO Almost Full interrupt only
+
+        {MAX30102_REG_FIFO_WRITE_POINTER, 0x00}, // init write pointer
+        {MAX30102_REG_OVERFLOW_COUNTER, 0x00},   // clear overflow counter
+        {MAX30102_REG_FIFO_READ_POINTER, 0x00},  // init read pointer
+
+        {MAX30102_REG_FIFO_CONFIG, 0x1c}, // SMP_AVE=000→1x, ROLLOVER=1→enabled,
+                                          // A_FULL=12→interrupt at 20 unread samples
+
+        {MAX30102_REG_MODE_CONFIG, 0x03}, // MODE=011 → SpO2 mode (Red+IR LEDs active)
+
+        {MAX30102_REG_SPO2_CONFIG,
+         0x67}, // ADC_RGE=11→16384nA, SR=001→100sps, PW=11→411µs/18-bit
+
+        {MAX30102_REG_LED_PULSE_1, 0x3f}, // LED1 current = 0x3F → ~12.6mA typical
+        {MAX30102_REG_LED_PULSE_2, 0x3f}  // LED2 current = 0x3F → ~12.6mA typical
     };
 
     for (size_t i = 0; i < array_size(reg_configs); i++) {
@@ -323,6 +273,7 @@ static int max30102_task(void *args) {
             WLID_LINK_SERVER_LOG_ERROR("write reg failed, ret = %" PRIu8 "\r\n", ret);
         }
     }
+    osal_msleep(200);
 
     max30102_sensor_buffers *p_fifo_buf = &g_max30102_buffers[0];
     max30102_sensor_buffers *p_cal_buf = &g_max30102_buffers[1];
@@ -331,11 +282,16 @@ static int max30102_task(void *args) {
     for (;;) {
         osal_msleep(1);
 
-        const int max30102_event =
-            osal_event_read(&g_max30102_event, MAX30102_EVENT_ALL, OSAL_EVENT_FOREVER,
-                            OSAL_WAITMODE_OR | OSAL_WAITMODE_CLR);
+        const int max30102_event = osal_event_read(
+            &g_max30102_event, MAX30102_EVENT_ALL, MAX30102_EVENT_READ_TIMEOUT_MS,
+            OSAL_WAITMODE_OR | OSAL_WAITMODE_CLR);
         if (max30102_event == OSAL_FAILURE) {
             WLID_LINK_SERVER_LOG_ERROR("failed to read max30102 event\r\n");
+            // If no event is received within timeout, it may be due to unconnected
+            // interrupt pin or untriggered interrupt callback.
+            // Force write FIFO almost full event to clear FIFO and ensure heart
+            // rate/SpO2 collection continues
+            osal_event_write(&g_max30102_event, MAX30102_EVENT_FIFO_A_FULL);
             continue;
         }
 
@@ -451,7 +407,7 @@ static int max30102_task(void *args) {
                 ", spo2 valid: %" PRIi8 "\r\n",
                 g_heart_rate, g_heart_rate_valid, g_spo2_val, g_spo2_valid);
 
-            if (signal_quality >= 60) {
+            if (signal_quality >= MAX30102_SIGNAL_QUALITY_THRESHOLD) {
                 if (g_heart_rate < 0 || g_heart_rate > 150) {
                     g_heart_rate_valid = 0;
                 }
@@ -501,7 +457,11 @@ static int max30102_task(void *args) {
         }
 
         if (max30102_event & MAX30102_EVENT_INT_TRIGGERED) {
-            max30102_irq_handler(&g_max30102_handle);
+            uint8_t irq_handler_ret = max30102_irq_handler(&g_max30102_handle);
+            if (irq_handler_ret != MAX30102_ERR_NONE) {
+                WLID_LINK_SERVER_LOG_ERROR("irq handler ret = %" PRIu8 "\r\n",
+                                           irq_handler_ret);
+            }
         }
     }
     osal_kthread_destroy(g_max30102_task_handle, 0);
@@ -579,4 +539,58 @@ static void max30102_interface_debug_print(const char *const fmt, ...) {
     va_start(args, fmt);
     osal_vprintk(fmt, args);
     va_end(args);
+}
+
+static void signal_preprocess_5th_order_smooth(int32_t *signal, uint32_t length) {
+    if (length < 5) {
+        return;
+    }
+
+    int32_t sum;
+    // 从后向前处理，避免数据覆盖
+    for (uint32_t i = length - 3; i >= 2; i--) {
+        sum = signal[i - 2] + signal[i - 1] + signal[i] + signal[i + 1] + signal[i + 2];
+        signal[i] = sum / 5;
+    }
+}
+
+static void signal_preprocess_lowpass_filter(int32_t *signal, uint32_t length,
+                                             int32_t sampling_rate, int32_t cutoff_hz) {
+    if (length < 2) {
+        return;
+    }
+
+    // 计算滤波系数
+    int32_t alpha = (2 * 314 * cutoff_hz * 1024) / (sampling_rate * 1000);
+    if (alpha > 1024)
+        alpha = 1024;
+    if (alpha < 1)
+        alpha = 1;
+
+    int32_t y_prev = signal[0];
+
+    for (uint32_t i = 1; i < length; i++) {
+        int32_t y = alpha * signal[i] + (1024 - alpha) * y_prev;
+        signal[i] = y / 1024;
+        y_prev = signal[i];
+    }
+}
+
+static void signal_preprocess_remove_baseline(int32_t *signal, uint32_t length) {
+    if (length < 2) {
+        return;
+    }
+
+    int32_t hp_alpha = 32;
+
+    int32_t x_prev = signal[0];
+    signal[0] = 0;
+    int32_t y_prev = 0;
+
+    for (uint32_t i = 0; i < length; i++) {
+        int32_t diff = signal[i] - x_prev;
+        y_prev = (hp_alpha * diff + (1024 - hp_alpha) * y_prev) / 1024;
+        signal[i] = y_prev;
+        x_prev = signal[i];
+    }
 }
