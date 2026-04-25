@@ -245,6 +245,9 @@ static int sle_server_task(void *args) {
                 /*out_heart_rate_valid = */ (bool *)&max30102_data[3]);
             sle_server_task_send_report_by_uuid(CONFIG_SLE_SERVER_MAX30102_UUID,
                                                 &max30102_data, sizeof(max30102_data));
+            WLID_LINK_SERVER_LOG_DEBUG(
+                "send max30102 data = %#02x, %#02x, %#02x, %#02x\r\n", max30102_data[0],
+                max30102_data[1], max30102_data[2], max30102_data[3]);
             osal_msleep(500);
 #endif // CONFIG_MAX30102_TASK_ENABLED
 
@@ -252,9 +255,13 @@ static int sle_server_task(void *args) {
             float max30205_temp = max30205_task_read_temperature();
             sle_server_task_send_report_by_uuid(CONFIG_SLE_SERVER_MAX30205_UUID,
                                                 &max30205_temp, sizeof(max30205_temp));
+            WLID_LINK_SERVER_LOG_DEBUG("send max30205 temp = %d.%02d\r\n",
+                                       (int)max30205_temp, (int)(max30205_temp * 100));
             osal_msleep(500);
 #endif // CONFIG_MAX30205_TASK_ENABLED
         }
+
+        osal_msleep(1);
     }
 
 _error_exit:

@@ -1,3 +1,5 @@
+#include <inttypes.h>
+
 #include "max30102.h"
 
 uint8_t max30102_init(max30102_handle_t *handle) {
@@ -168,6 +170,8 @@ uint8_t max30102_irq_handler(max30102_handle_t *handle) {
     ret = handle->i2c_read(MAX30102_I2C_ADDR_7BIT, MAX30102_REG_INTERRUPT_STATUS_1,
                            &int_status_x, sizeof(int_status_x));
     if (ret != MAX30102_ERR_NONE) {
+        handle->debug_print("failed to read int status register 1,ret = %" PRIu8 "\r\n",
+                            ret);
         goto error;
     }
 
@@ -185,6 +189,8 @@ uint8_t max30102_irq_handler(max30102_handle_t *handle) {
     ret = handle->i2c_read(MAX30102_I2C_ADDR_7BIT, MAX30102_REG_INTERRUPT_STATUS_2,
                            &int_status_x, sizeof(int_status_x));
     if (ret != MAX30102_ERR_NONE) {
+        handle->debug_print("failed to read int status register 2,ret = %" PRIu8 "\r\n",
+                            ret);
         goto error;
     }
 

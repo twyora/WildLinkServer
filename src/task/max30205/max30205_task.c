@@ -101,20 +101,32 @@ static int max30205_task(void *args) {
 
     uint8_t ret;
     ret = max30205_set_addr_pin(&max30205_handle, MAX30205_ADDRESS_0);
-    WLID_LINK_SERVER_LOG_INFO("ret = %" PRIu8 "\r\n", ret);
+    if (ret != 0) {
+        WLID_LINK_SERVER_LOG_ERROR(
+            "failed to set max30205 address pin, ret = %" PRIu8 "\r\n", ret);
+    }
+
     ret = max30205_init(&max30205_handle);
-    WLID_LINK_SERVER_LOG_INFO("ret = %" PRIu8 "\r\n", ret);
+    if (ret != 0) {
+        WLID_LINK_SERVER_LOG_ERROR("failed to init max30205, ret = %" PRIu8 "\r\n",
+                                   ret);
+    }
+
     ret = max30205_set_data_format(&max30205_handle, MAX30205_DATA_FORMAT_NORMAL);
-    WLID_LINK_SERVER_LOG_INFO("ret = %" PRIu8 "\r\n", ret);
+    if (ret != 0) {
+        WLID_LINK_SERVER_LOG_ERROR(
+            "failed to set max30205 data format, ret = %" PRIu8 "\r\n", ret);
+    }
 
     int16_t temp_raw = 0;
     for (;;) {
         osal_msleep(3000);
         max30205_single_read(&max30205_handle, &temp_raw, &temperature);
-        WLID_LINK_SERVER_LOG_INFO("temperature raw = %#04" PRIx16
-                                  ", temperature * 100 = %" PRId32 "\r\n",
-                                  temp_raw, (int)((temperature + 64) * 100));
-        max30205_single_read(&max30205_handle, &temp_raw, &temperature);
+        temperature += 64;
+
+        WLID_LINK_SERVER_LOG_DEBUG("temperature raw = %#04" PRIx16
+                                   ", temperature * 100 = %" PRId32 "\r\n",
+                                   temp_raw, (int)(temperature * 100));
     }
 
     return 0;
